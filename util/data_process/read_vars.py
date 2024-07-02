@@ -2,6 +2,8 @@ import pandas as pd
 from tqdm.auto import tqdm
 import numpy as np
 import glob
+import ast
+import pickle
 
 def remove_storms(trackpath=None,basinID='NA',yearmin=None,yearmax=None,remove_set=None):
     """
@@ -45,6 +47,34 @@ def read_SHIPS_csv(startyear=None,endyear=None,vars_path=None,filted_TCnames=Non
             storestorms[filt_TCyear[i]] = read_processed_vars_ships(vars_path,suffixlist,year,filt_TCyear[i])
         storeyear.append(storestorms)
     return storeyear
+
+def create_SHIPS_df(startyear=None,endyear=None,SHIPSdict=None,wantvarnames=None,targetname=None,filted_TCnames=None,lagnum=None):
+    store_dfstorms = {}
+    for inddd,year in tqdm(enumerate([int(obj) for obj in np.linspace(int(startyear),int(endyear),int(endyear)-int(startyear)+1)])):
+        filt_TCyear = filted_TCnames[inddd]
+        want_varnames = ast.literal_eval(wantvarnames)
+        df_storms = {}
+        for stormname in filt_TCyear:
+            temp = pd.concat([SHIPSdict[inddd][stormname][i] for i in range(len(SHIPSdict[inddd][stormname]))], axis=1, join='inner')
+            tempv = temp[targetname][lagnum:].reset_index(drop=True)
+            tempd = temp[want_varnames][:-lagnum].reset_index(drop=True)
+            df_storms[stormname] = pd.concat([tempv,tempd], axis=1, join='inner')
+        store_dfstorms[year]=df_storms
+    return store_dfstorms
+
+def add_derive_df(startyear=None,endyear=None,SHIPSdict=None,addfilepath=None,addvarname=None,filted_TCnames=None,lagnum=None):
+    with open(addfilepath, 'rb') as f:
+        ships_df = pickle.load(f)   
+    store_dfstorms = {}
+    for inddd,year in tqdm(enumerate([int(obj) for obj in np.linspace(int(startyear),int(endyear),int(endyear)-int(startyear)+1)])):
+        filt_TCyear = filted_TCnames[inddd]
+        df_storms = {}
+        for stormname in filt_TCyear:
+            temp = ships_df[year][stormname]
+            tempd = temp[addvarname][:-lagnum].reset_index(drop=True)
+            df_storms[stormname] = pd.concat([SHIPSdict[year][stormname],tempd], axis=1, join='inner')
+        store_dfstorms[year]=df_storms
+    return store_dfstorms
 
 
 

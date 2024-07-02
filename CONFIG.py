@@ -7,6 +7,7 @@ def create_config():
     config['General'] = {'start_year': 2000,
                          'end_year': 2021,
                          'target_lag':4,
+                         'splitratio':0.15,
                         }
     config['Dataset'] = {'TCfilt': 
                          [(2010,'MATTHEW'),(2010,'NICOLE'),(2012,'KIRK'),(2013,'ERIN'),(2021,'ODETTE')],
