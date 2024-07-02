@@ -18,6 +18,9 @@ def create_config():
     config['paths'] = {'tracks_path': '/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/besttracks/na/',
                        'vars_path': '/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/ts_notebooks/ships/timeseries/',
                       }
+    config['causal'] = {'tau_min': 4,
+                        'tau_max': 4,
+                       }
     
     # Write the config to a file
     with open('config.ini','w') as configfile:

@@ -15,6 +15,8 @@ def read_config():
     SHIPSops_varname = config.get('Dataset','SHIPSop_varname')
     track_path = config.get('paths','tracks_path')
     vars_path = config.get('paths','vars_path')
+    tau_min = config.get('causal','tau_min')
+    tau_max = config.get('causal','tau_max')
     
     
     # Return dictionary
@@ -27,6 +29,8 @@ def read_config():
         'target_lag':target_lag,
         'splitratio':splitratio,
         'SHIPSops_varname':SHIPSops_varname,
+        'tau_min':tau_min,
+        'tau_max':tau_max,
     }
     return config_values
     

@@ -8,6 +8,7 @@ import matplotlib
 import glob,os
 from tqdm.auto import tqdm
 import math
+from scipy.ndimage import gaussian_filter1d
 
 class proc_data:
     def __init__(self,df=None,seed=42):
@@ -72,6 +73,47 @@ class proc_data:
                 traindata[stormnames_fulllist[ind]] = trainvaliddata[stormnames_fulllist[ind]]
         return traindata,validdata,testdata,validindex
         
+    def smooth_and_minindices(self,varname='MSLP',sigma=3):
+        smoothed_set,pmin = {},{}
+        for key in self.df['train'].keys():
+            temp = gaussian_filter1d(self.df['train'][key][varname],3)
+            smoothed_set[key] = temp
+            pmin[key] = temp.argmin()
+            
+        smoothed_set_valid,pmin_valid = {},{}
+        for key in self.df['valid'].keys():
+            temp = gaussian_filter1d(self.df['valid'][key][varname],3)
+            smoothed_set_valid[key] = temp
+            pmin_valid[key] = temp.argmin()
+            
+        smoothed_set_test,pmin_test = {},{}
+        for key in self.df['test'].keys():
+            temp = gaussian_filter1d(self.df['test'][key][varname],3)
+            smoothed_set_test[key] = temp
+            pmin_test[key] = temp.argmin()
+        return {'train':smoothed_set,'valid':smoothed_set_valid,'test':smoothed_set_test}, {'train':pmin,'valid':pmin_valid,'test':pmin_test}
+
+    def align_data(self,refpoint=None,individualpoint=None,data=None):
+        newtraincyclone2 = np.zeros((data.shape[0]+(refpoint-individualpoint),data.shape[1]))
+        for i in range((data.shape[1])):
+            newtraincyclone2[:,i] = np.concatenate([np.ones((refpoint-individualpoint))*(-999.),data[:,i]])
+        return newtraincyclone2
+    
+    def do_data_align(self,newddwp=None,indices=None,var_names=None):
+        aligned_newddwp = {}
+        for intt,obj in enumerate(newddwp.keys()):
+            temp = pd.DataFrame(self.align_data(np.asarray(list(indices.values())).max(),indices[obj],np.asarray(newddwp[obj])),columns=var_names)
+            aligned_newddwp[obj] = temp.replace(-999.0,np.nan)
+        return aligned_newddwp
+        
+    def combine_for_PC1(self,Xdataset=None,ydataset=None,target=None):
+        # Insert targets back to the Dataframe for PC1
+        X_forPC1 = deepcopy(Xdataset)
+        X_forPC1['train'].insert(loc=0, column=target, value=ydataset['train'])
+        X_forPC1['valid'].insert(loc=0, column=target, value=ydataset['valid'])
+        X_forPC1['test'].insert(loc=0, column=target, value=ydataset['test'])
+        return X_forPC1
+        
 # Split data into three subsets
 def splitdata_handler(df=None,method='random',seed=None,config=None,testyears=[2020,2021]):
     if method=='random':
@@ -86,6 +128,29 @@ def splitdata_handler(df=None,method='random',seed=None,config=None,testyears=[2
         traindata,validdata,testdata,validindex = proc_data(df=df,seed=seed).year_splitdata(testyears=testyears,config=config)
         return {'train':traindata,'valid':validdata,'test':testdata,'validindex':validindex}
 
+def normalized_TCs_handler(train=None,valid=None,test=None,trainmean=None,trainstd=None,dropcol=['DELV24'],target=None):
+    train_norml = {key: normalize_data(train[key].drop(columns=dropcol),trainmean,trainstd) for key in train.keys()}
+    valid_norml = {key: normalize_data(valid[key].drop(columns=dropcol),trainmean,trainstd) for key in valid.keys()}
+    test_norml = {key: normalize_data(test[key].drop(columns=dropcol),trainmean,trainstd) for key in test.keys()}
+
+    sss_train,sss_valid,sss_test = {},{},{}
+    for key in train_norml.keys():
+        train_norml[key][target] = train[key][target]
+        cols = [train_norml[key].columns[-1]] + train_norml[key].columns[:-1].tolist()  # move last column to front
+        sss_train[key] = train_norml[key][cols]
+
+    for key in valid_norml.keys():
+        valid_norml[key][target] = valid[key][target]
+        cols = [valid_norml[key].columns[-1]] + valid_norml[key].columns[:-1].tolist()  # move last column to front
+        sss_valid[key] = valid_norml[key][cols]
+
+    for key in test_norml.keys():
+        test_norml[key][target] = test[key][target]
+        cols = [test_norml[key].columns[-1]] + test_norml[key].columns[:-1].tolist()  # move last column to front
+        sss_test[key] = test_norml[key][cols]
+    
+    return {'train':sss_train,'valid':sss_valid,'test':sss_test}
+    
 def combine_df_storms(datastore=None,targetname=None):
     storepred,storetarget,outsize = [],[],[]
     for stormname in datastore.keys():
@@ -101,6 +166,9 @@ def df_proc_separate(trainstore=None,validstore=None,teststore=None,target='DELV
     yvalid,Xvalid,validsize = combine_df_storms(datastore=validstore,targetname=target)
     ytest,Xtest,testsize = combine_df_storms(datastore=teststore,targetname=target)
     return {'train':Xtrain,'valid':Xvalid,'test':Xtest},{'train':ytrain,'valid':yvalid,'test':ytest},{'train':trainsize,'valid':validsize,'test':testsize}
+
+def normalize_data(X, mean, std):
+    return (X-mean)/std
 
 
 
