@@ -13,10 +13,12 @@ def read_config():
     splitratio = config.get('General','splitratio')
     filt_TCs = config.get('Dataset', 'TCfilt')
     SHIPSops_varname = config.get('Dataset','SHIPSop_varname')
+    ERA5_dropvarname = config.get('Dataset','ERA5_dropvarname')
     track_path = config.get('paths','tracks_path')
     vars_path = config.get('paths','vars_path')
     tau_min = config.get('causal','tau_min')
     tau_max = config.get('causal','tau_max')
+    alpha_totest = config.get('causal','alpha_totest')
     
     
     # Return dictionary
@@ -29,8 +31,10 @@ def read_config():
         'target_lag':target_lag,
         'splitratio':splitratio,
         'SHIPSops_varname':SHIPSops_varname,
+        'ERA5_dropvarname':ERA5_dropvarname,
         'tau_min':tau_min,
         'tau_max':tau_max,
+        'alpha_totest':alpha_totest
     }
     return config_values
     
