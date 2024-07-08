@@ -6,13 +6,17 @@ def create_config():
     # Add sections and value pairs
     config['General'] = {'start_year': 2000,
                          'end_year': 2021,
-                         'target_lag':8,
+                         'target_lag':4,
                          'splitratio':0.2,
+                         'PRIMED_levels':[100, 150, 200, 250, 300, 400,  500, 700, 850, 1000],
                         }
     config['Dataset'] = {'TCfilt': 
                          [(2010,'MATTHEW'),(2010,'NICOLE'),(2012,'KIRK'),(2013,'ERIN'),(2021,'ODETTE')],
                          'SHIPSop_varname':['VMAX','MSLP','T200','T250','LAT','CSST','PSLV','Z850','D200','EPOS','SHDC',\
                                             'RHMD','TWAC','G200','TADV','SHGC','POT','POT2','LHRD','VSHR','PER','VPER'],
+                         'ERA5SPS_varname':['wind10','pmin','out_t250','out_t200','spdx','out_mean_midrhum',\
+                                            'POT','POT2','PER','VPER','pc20','VSHR','LHRD','EPOS','clat','tadv','shearmag',\
+                                            'out_shearmag','sdir','d200','z850','twnd850'],
                          'ERA5_dropvarname':['pmin','wind10', 'delv','div_50','div_600','div_800','div_925', 'eqt600', 'eqt800', 'eqt925', '2mdewtmp','2mtmp',\
                                              'conv_ppt','tot_cld_ice','tot_cldwtr','tot_cld_rain','vi_div_cld_froz_wtr','vi_div_cld_liq_wtr',\
                                              'vi_div_gpot_flux','vi_div_ke_flux','vi_div_mass_flux','vi_div_moisture_flux','vi_div_olr_flux',\
@@ -40,9 +44,11 @@ def create_config():
                         }
     config['paths'] = {'tracks_path': '/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/besttracks/na/',
                        'vars_path': '/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/ts_notebooks/ships/timeseries/',
+                       'PRIMED_path':'/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/ts_notebooks/ships/tc_primed_names/',
+                       'ERA5_SHIPSemul_path':'/work/FAC/FGSE/IDYST/tbeucler/default/saranya/causal/SHIPS/ships_pkl/',
                       }
-    config['causal'] = {'tau_min': 8,
-                        'tau_max': 8,
+    config['causal'] = {'tau_min': 4,
+                        'tau_max': 4,
                         'alpha_totest':[0.0001, 0.00015 ,0.001,0.0015,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,
                                         0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.86,0.88,0.9,0.92,0.94,0.95,0.96]
                        }
