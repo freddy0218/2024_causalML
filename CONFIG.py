@@ -9,6 +9,7 @@ def create_config():
                          'target_lag':4,
                          'splitratio':0.2,
                          'PRIMED_levels':[100, 150, 200, 250, 300, 400,  500, 700, 850, 1000],
+                         'basin':'NA',
                         }
     config['Dataset'] = {'TCfilt': 
                          [(2010,'MATTHEW'),(2010,'NICOLE'),(2012,'KIRK'),(2013,'ERIN'),(2021,'ODETTE')],

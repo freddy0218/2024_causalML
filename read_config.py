@@ -10,6 +10,7 @@ def read_config():
     start_year = config.get('General','start_year')
     end_year = config.get('General','end_year')
     target_lag = config.get('General','target_lag')
+    basin = config.get('General','basin')
     splitratio = config.get('General','splitratio')
     PRIMED_levels = config.get('General','PRIMED_levels')
     filt_TCs = config.get('Dataset', 'TCfilt')
@@ -30,6 +31,7 @@ def read_config():
         'TCfilt': filt_TCs,
         'track_path':track_path,
         'vars_path':vars_path,
+        'basin':basin,
         'PRIMED_path':PRIMED_path,
         'ERA5SPS_path':ERA5SPS_path,
         'PRIMED_levels':PRIMED_levels,

@@ -49,7 +49,7 @@ def read_SHIPS_csv(startyear=None,endyear=None,vars_path=None,filted_TCnames=Non
         storeyear.append(storestorms)
     return storeyear
 
-def create_SHIPS_df(startyear=None,endyear=None,SHIPSdict=None,wantvarnames=None,targetname=None,filted_TCnames=None,lagnum=None):
+def create_SHIPS_df(startyear=None,endyear=None,SHIPSdict=None,wantvarnames=None,targetname=None,filted_TCnames=None,lagnum=None,withshift='Yes' or 'No'):
     store_dfstorms = {}
     for inddd,year in tqdm(enumerate([int(obj) for obj in np.linspace(int(startyear),int(endyear),int(endyear)-int(startyear)+1)])):
         filt_TCyear = filted_TCnames[inddd]
@@ -57,13 +57,17 @@ def create_SHIPS_df(startyear=None,endyear=None,SHIPSdict=None,wantvarnames=None
         df_storms = {}
         for stormname in filt_TCyear:
             temp = pd.concat([SHIPSdict[inddd][stormname][i] for i in range(len(SHIPSdict[inddd][stormname]))], axis=1, join='inner')
-            tempv = temp[targetname][lagnum:].reset_index(drop=True)
-            tempd = temp[want_varnames][:-lagnum].reset_index(drop=True)
+            if withshift=='Yes':
+                tempv = temp[targetname][lagnum:].reset_index(drop=True)
+                tempd = temp[want_varnames][:-lagnum].reset_index(drop=True)
+            elif withshift=='No':
+                tempv = temp[targetname].reset_index(drop=True)
+                tempd = temp[want_varnames].reset_index(drop=True)
             df_storms[stormname] = pd.concat([tempv,tempd], axis=1, join='inner')
         store_dfstorms[year]=df_storms
     return store_dfstorms
 
-def add_derive_df(startyear=None,endyear=None,SHIPSdict=None,addfilepath=None,addvarname=None,filted_TCnames=None,lagnum=None):
+def add_derive_df(startyear=None,endyear=None,SHIPSdict=None,addfilepath=None,addvarname=None,filted_TCnames=None,lagnum=None,withshift='Yes' or 'No'):
     with open(addfilepath, 'rb') as f:
         ships_df = pickle.load(f)   
     store_dfstorms = {}
@@ -72,7 +76,10 @@ def add_derive_df(startyear=None,endyear=None,SHIPSdict=None,addfilepath=None,ad
         df_storms = {}
         for stormname in filt_TCyear:
             temp = ships_df[year][stormname]
-            tempd = temp[addvarname][:-lagnum].reset_index(drop=True)
+            if withshift=='Yes':
+                tempd = temp[addvarname][:-lagnum].reset_index(drop=True)
+            elif withshift=='No':
+                tempd = temp[addvarname].reset_index(drop=True)                
             df_storms[stormname] = pd.concat([SHIPSdict[year][stormname],tempd], axis=1, join='inner')
         store_dfstorms[year]=df_storms
     return store_dfstorms
@@ -159,7 +166,7 @@ def read_TCPRIMED_df(startyear=None,endyear=None,ERA5dict=None,filted_TCnames=No
     return store_dfstorms
 
 def create_ERA5_df(startyear=None,endyear=None,ERA5SPS_path=None,ERA5SPS_suffix='all_storms_ships23vars_obswmax.pkl',
-                   ERA5dict=None,wantvarnames=None,targetname=None,filted_TCnames=None,lagnum=None):
+                   ERA5dict=None,wantvarnames=None,targetname=None,filted_TCnames=None,lagnum=None,withshift='Yes' or 'No'):
     with open(ERA5SPS_path+ERA5SPS_suffix, 'rb') as f:
         ships_df = pickle.load(f)
         store_dfstorms_era5ships = {}
@@ -169,9 +176,14 @@ def create_ERA5_df(startyear=None,endyear=None,ERA5SPS_path=None,ERA5SPS_suffix=
         for stormname in stormnames:
             temps = ships_df[year][stormname]
             temp = ERA5dict[year][stormname]
-            tempv = temp[targetname][lagnum:].reset_index(drop=True)
-            tempq = temp.drop([targetname], axis=1)[:-lagnum].reset_index(drop=True)
-            tempd = temps[wantvarnames][:-lagnum].reset_index(drop=True)
+            if withshift=='Yes':
+                tempv = temp[targetname][lagnum:].reset_index(drop=True)
+                tempq = temp.drop([targetname], axis=1)[:-lagnum].reset_index(drop=True)
+                tempd = temps[wantvarnames][:-lagnum].reset_index(drop=True)
+            elif withshift=='No':
+                tempv = temp[targetname].reset_index(drop=True)
+                tempq = temp.drop([targetname], axis=1).reset_index(drop=True)
+                tempd = temps[wantvarnames].reset_index(drop=True)
             df_storms[stormname] = pd.concat([tempv,tempd,tempq], axis=1, join='inner')
         store_dfstorms_era5ships[year] = df_storms
     return store_dfstorms_era5ships
