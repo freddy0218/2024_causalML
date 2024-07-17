@@ -1,4 +1,3 @@
-from copy import deepcopy
 # Imports
 import pandas as pd
 import numpy as np
@@ -8,7 +7,18 @@ import glob,os
 from tqdm.auto import tqdm
 import math
 from sklearn.metrics import r2_score,mean_absolute_error,mean_squared_error
+import itertools
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import RandomizedSearchCV
+from util.data_process import read_vars, proc_dataset, miss
+from util.models import performance_scores,train_baseline,causal_settings,train_PC1
 
+def train_rf(n_estimators=None,max_features=None,max_depth=None,min_samples_split=None,
+             min_samples_leaf=None,bootstrap=None,X=None,y=None):
+    rf =  RandomForestRegressor(n_estimators=n_estimators,max_features=max_features,max_depth=max_depth,
+                                 min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,bootstrap=bootstrap)
+    return rf.fit(X,y)
+    
 class scoreboard:
     def __init__(self,model=None):
         self.model = model
@@ -46,10 +56,34 @@ class scoreboard:
         return score_dict
         
 class scores_seeds:
-    def __init__(self,seed=None,target=None,lag=None):
+    def __init__(self,seed=None,target=None,lag=None,exp=None):
         self.seed=seed
         self.target=target
         self.lagtime=lag
+        self.exp=exp
+
+    def get_best_rf_vars(self,Xnorml=None,target=None,var_names=None):
+        ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+        Xtrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna().drop(columns=[target])[:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+        yvalid = np.concatenate([np.asarray(Xnorml['valid'][key].dropna()[target][self.lagtime:]) for key in Xnorml['valid'].keys()],axis=0)
+        Xvalid = np.concatenate([np.asarray(Xnorml['valid'][key].dropna().drop(columns=[target])[:-self.lagtime]) for key in Xnorml['valid'].keys()],axis=0)
+        
+        random_grid = {'n_estimators':[20,30,40],'max_features':[None],
+                       'max_depth':[20,30,40],'min_samples_split':[40,80],
+                       'min_samples_leaf':[40,80],'bootstrap':[True]
+                      }
+        
+        options = list(itertools.product(random_grid['n_estimators'],random_grid['max_features'],random_grid['max_depth'],\
+                                         random_grid['min_samples_split'],random_grid['min_samples_leaf'],random_grid['bootstrap']))
+        
+        models = []
+        for obj in options:
+            model = train_rf(obj[0],obj[1],obj[2],obj[3],obj[4],obj[5],Xtrain,ytrain)
+            models.append(model)
+        
+        bestindex = np.asarray([r2_score(yvalid,models[i].predict(Xvalid)) for i in range(len(models))]).argmax()
+        forest_importances_gini = pd.Series(models[bestindex].feature_importances_,index=var_names[1:])
+        return forest_importances_gini#.sort_values(ascending=False).index
         
     def score_noFS(self,Xnorml=None,target=None):
         """
@@ -91,12 +125,71 @@ class scores_seeds:
         return {'scoreboard':performance_scores.scoreboard(regr_causal).store_scores(Xnorml_causal,y),
                 'X':Xnorml_causal,
                 'y':y,
-                'regr':regr_causal
+                'regr':regr_causal,
+                'corrrank':causal_predictor_list
                }
         
-    def read_stored(self):
-        return miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+'SHIPSonly_causal/'+'results_seed'+str(int(self.seed))+'.pkl')
+    def score_corrFS(self,Xnorml=None,target=None,var_names=None,shapez=None):
+        # Create Dataset
+        ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+        Xtrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna().drop(columns=[target])[:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+        # put into a dataframe
+        Xnorml_df_train = pd.DataFrame(Xtrain,columns=[var_names[1:]])
+        Xnorml_df_train[target] = ytrain
+        # Rank the correlation between different features and the target
+        corrrank = pd.Series({name: np.abs(Xnorml_df_train[name].iloc[:,0].corr(Xnorml_df_train[target].iloc[:,0])) for name in var_names[1:]})
         
+        # Score Correlation
+        scores_s = []
+        corr_list = corrrank.sort_values(ascending=False).index
+        Xs,ys,regr_corrs = [],[],[]
+        for i in range(1,shapez-1):#len(corr_list)-1):
+            Xtrain_corr = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[corr_list[:i]][:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+            Xvalid_corr = np.concatenate([np.asarray(Xnorml['valid'][key].dropna()[corr_list[:i]][:-self.lagtime]) for key in Xnorml['valid'].keys()],axis=0)
+            Xtest_corr = np.concatenate([np.asarray(Xnorml['test'][key].dropna()[corr_list[:i]][:-self.lagtime]) for key in Xnorml['test'].keys()],axis=0)
+            ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+            yvalid = np.concatenate([np.asarray(Xnorml['valid'][key].dropna()[target][self.lagtime:]) for key in Xnorml['valid'].keys()],axis=0)
+            ytest = np.concatenate([np.asarray(Xnorml['test'][key].dropna()[target][self.lagtime:]) for key in Xnorml['test'].keys()],axis=0)
+            
+            Xnorml_corr = {'train': Xtrain_corr, 'valid': Xvalid_corr, 'test': Xtest_corr}
+            Xs.append(Xnorml_corr)
+            y = {'train': ytrain, 'valid': yvalid, 'test': ytest}
+            ys.append(y)
+            regr_corr = train_baseline.train_baseline_MLR(Xnorml_corr,y)
+            regr_corrs.append(regr_corr)
+            corrmlr_score = performance_scores.scoreboard(regr_corr).store_scores(Xnorml_corr,y)
+            scores_s.append(corrmlr_score)
+            
+        return {'scoreboard':scores_s,'X':Xs,'y':ys,'regr':regr_corrs,'corrrank':corrrank}
+
+    def score_XAIFS(self,Xnorml=None,target=None,var_names=None):
+        XAIgini = self.get_best_rf_vars(Xnorml=Xnorml,target=target,var_names=var_names)
+        scores_s = []
+        XAI_list = XAIgini.sort_values(ascending=False).index
+        Xs,ys,regr_corrs = [],[],[]
+        for i in range(1,len(XAI_list)-1):
+            Xtrain_corr = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[XAI_list[:i]][:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+            Xvalid_corr = np.concatenate([np.asarray(Xnorml['valid'][key].dropna()[XAI_list[:i]][:-self.lagtime]) for key in Xnorml['valid'].keys()],axis=0)
+            Xtest_corr = np.concatenate([np.asarray(Xnorml['test'][key].dropna()[XAI_list[:i]][:-self.lagtime]) for key in Xnorml['test'].keys()],axis=0)
+            ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+            yvalid = np.concatenate([np.asarray(Xnorml['valid'][key].dropna()[target][self.lagtime:]) for key in Xnorml['valid'].keys()],axis=0)
+            ytest = np.concatenate([np.asarray(Xnorml['test'][key].dropna()[target][self.lagtime:]) for key in Xnorml['test'].keys()],axis=0)
+            
+            Xnorml_corr = {'train': Xtrain_corr, 'valid': Xvalid_corr, 'test': Xtest_corr}
+            Xs.append(Xnorml_corr)
+            y = {'train': ytrain, 'valid': yvalid, 'test': ytest}
+            ys.append(y)
+            regr_corr = train_baseline.train_baseline_MLR(Xnorml_corr,y)
+            regr_corrs.append(regr_corr)
+            corrmlr_score = performance_scores.scoreboard(regr_corr).store_scores(Xnorml_corr,y)
+            scores_s.append(corrmlr_score)
+            
+        return {'scoreboard':scores_s,'X':Xs,'y':ys,'regr':regr_corrs,'XAIrank':XAIgini}
+        
+    def read_stored(self):
+        #miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+'SHIPSonly_causal/'+'results_seed'+str(int(self.seed))+'.pkl')
+        return miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+str(self.exp)+'/'+'results_seed'+str(int(self.seed))+'.pkl')
+
     def run_score_noFS(self):
         store = self.read_stored()
         return self.score_noFS(store['dataframes'],self.target)
@@ -108,3 +201,11 @@ class scores_seeds:
         for obj in results:
             storescores.append(self.score_causalFS(obj,store['dataframes'],self.target,store['var_names']))
         return storescores
+
+    def run_score_corrFS(self,shapez=None):
+        store = self.read_stored()
+        return self.score_corrFS(store['dataframes'],self.target,store['var_names'],shapez=shapez)
+
+    def run_score_XAIFS(self):
+        store = self.read_stored()
+        return self.score_XAIFS(store['dataframes'],self.target,store['var_names'])

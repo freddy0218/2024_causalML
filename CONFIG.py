@@ -1,5 +1,8 @@
 import configparser
-
+#---------------------------------------------------------------------------------------------------------
+# Notes:
+# (1) Remove "VMAX" from "SHIPSop_varname" if you would like to set "VMAX" as a target
+#---------------------------------------------------------------------------------------------------------
 def create_config():
     config = configparser.ConfigParser()
 
@@ -13,7 +16,7 @@ def create_config():
                         }
     config['Dataset'] = {'TCfilt': 
                          [(2010,'MATTHEW'),(2010,'NICOLE'),(2012,'KIRK'),(2013,'ERIN'),(2021,'ODETTE')],
-                         'SHIPSop_varname':['VMAX','MSLP','T200','T250','LAT','CSST','PSLV','Z850','D200','EPOS','SHDC',\
+                         'SHIPSop_varname':['MSLP','T200','T250','LAT','CSST','PSLV','Z850','D200','EPOS','SHDC',\
                                             'RHMD','TWAC','G200','TADV','SHGC','POT','POT2','LHRD','VSHR','PER','VPER'],
                          'ERA5SPS_varname':['wind10','pmin','out_t250','out_t200','spdx','out_mean_midrhum',\
                                             'POT','POT2','PER','VPER','pc20','VSHR','LHRD','EPOS','clat','tadv','shearmag',\
