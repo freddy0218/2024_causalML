@@ -87,7 +87,7 @@ def add_derive_df(startyear=None,endyear=None,SHIPSdict=None,addfilepath=None,ad
 ################################################################################################################################################################
 # ERA5 routine
 ################################################################################################################################################################
-def read_processed_vars_era5(loc=None,foldernames=['obsw_dwmax','tigramite_6hr'],year=None,stormname=None,era5_dropvar=None):
+def read_processed_vars_era5(loc=None,foldernames=['obsw_dwmax','tigramite_6hr'],year=None,stormname=None,era5_dropvar=None,targetname=None):
     """
     era5_dropvar: Variables dropped due to inconsistency with SHIPS 
     """
@@ -107,9 +107,9 @@ def read_processed_vars_era5(loc=None,foldernames=['obsw_dwmax','tigramite_6hr']
         tmp = pd.read_csv(glob.glob(loc+str(foldername)+'/'+str(year)+'/'+str(year)+'*'+str(stormname)+'.csv')[0],delimiter=r",").fillna(0)
         tmp = _clean_up(tmp)
         
-        if foldername=='obsw_dwmax':
+        if foldername!='tigramite_6hr':
             tmp = tmp.iloc[:,:]
-            tmp = tmp[['delv24']]
+            tmp = tmp[[targetname]]
 
         if foldername=='tigramite_6hr':
             tmp = tmp.iloc[:,:]
