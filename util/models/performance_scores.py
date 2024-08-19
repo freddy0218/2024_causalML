@@ -56,11 +56,13 @@ class scoreboard:
         return score_dict
         
 class scores_seeds:
-    def __init__(self,seed=None,target=None,lag=None,exp=None):
+    def __init__(self,seed=None,target=None,lag=None,exp=None,alt_exp=None,alt_target=None):
         self.seed=seed
         self.target=target
         self.lagtime=lag
         self.exp=exp
+        self.alt_exp=alt_exp # Patch for experiment trained with VMAX
+        self.alt_target=alt_target # Yes or No with routines with VMAX experiments
 
     def get_best_rf_vars(self,Xnorml=None,target=None,var_names=None):
         ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
@@ -129,15 +131,25 @@ class scores_seeds:
                 'corrrank':causal_predictor_list
                }
         
-    def score_corrFS(self,Xnorml=None,target=None,var_names=None,shapez=None):
-        # Create Dataset
-        ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
-        Xtrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna().drop(columns=[target])[:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
-        # put into a dataframe
-        Xnorml_df_train = pd.DataFrame(Xtrain,columns=[var_names[1:]])
-        Xnorml_df_train[target] = ytrain
-        # Rank the correlation between different features and the target
-        corrrank = pd.Series({name: np.abs(Xnorml_df_train[name].iloc[:,0].corr(Xnorml_df_train[target].iloc[:,0])) for name in var_names[1:]})
+    def score_corrFS(self,Xnorml=None,target=None,targetcausal='VMAX',var_names=None,shapez=None):
+        if self.alt_target=='Yes':
+            # Create Dataset
+            ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[targetcausal][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+            Xtrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna().drop(columns=[target,targetcausal])[:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+            # put into a dataframe
+            Xnorml_df_train = pd.DataFrame(Xtrain,columns=[var_names[1:]])
+            Xnorml_df_train[target] = ytrain
+            # Rank the correlation between different features and the target
+            corrrank = pd.Series({name: np.abs(Xnorml_df_train[name].iloc[:,0].corr(Xnorml_df_train[target].iloc[:,0])) for name in var_names[1:]})            
+        else:
+            # Create Dataset
+            ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
+            Xtrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna().drop(columns=[target])[:-self.lagtime]) for key in Xnorml['train'].keys()],axis=0)
+            # put into a dataframe
+            Xnorml_df_train = pd.DataFrame(Xtrain,columns=[var_names[1:]])
+            Xnorml_df_train[target] = ytrain
+            # Rank the correlation between different features and the target
+            corrrank = pd.Series({name: np.abs(Xnorml_df_train[name].iloc[:,0].corr(Xnorml_df_train[target].iloc[:,0])) for name in var_names[1:]})
         
         # Score Correlation
         scores_s = []
@@ -186,26 +198,44 @@ class scores_seeds:
             
         return {'scoreboard':scores_s,'X':Xs,'y':ys,'regr':regr_corrs,'XAIrank':XAIgini}
         
-    def read_stored(self):
+    def read_stored(self,exp=None):
         #miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+'SHIPSonly_causal/'+'results_seed'+str(int(self.seed))+'.pkl')
-        return miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+str(self.exp)+'/'+'results_seed'+str(int(self.seed))+'.pkl')
+        return miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+str(exp)+'/'+'results_seed'+str(int(self.seed))+'.pkl')
 
     def run_score_noFS(self):
-        store = self.read_stored()
+        store = self.read_stored(exp=self.exp)
         return self.score_noFS(store['dataframes'],self.target)
         
     def run_score_causalFS(self):
-        store = self.read_stored()
-        results = store['PC1_results']
-        storescores = []
-        for obj in results:
-            storescores.append(self.score_causalFS(obj,store['dataframes'],self.target,store['var_names']))
+        if self.alt_target=='Yes':
+            store = self.read_stored(exp=self.exp) #Exp trained on DELV
+            alt_store = self.read_stored(exp=self.alt_exp) #Exp trained on VMAX
+            results = store['PC1_results']
+            storescores = []
+            for obj in results:
+                storescores.append(self.score_causalFS(obj,alt_store['dataframes'],self.target,store['var_names']))
+        else: 
+            store = self.read_stored(exp=self.exp)
+            results = store['PC1_results']
+            storescores = []
+            for obj in results:
+                storescores.append(self.score_causalFS(obj,store['dataframes'],self.target,store['var_names']))
         return storescores
 
-    def run_score_corrFS(self,shapez=None):
-        store = self.read_stored()
-        return self.score_corrFS(store['dataframes'],self.target,store['var_names'],shapez=shapez)
+    def run_score_corrFS(self,shapez=None,targetcausal=None):
+        if self.alt_target=='Yes':
+            store = self.read_stored(exp=self.exp)
+            alt_store = self.read_stored(exp=self.alt_exp)
+            return self.score_corrFS(alt_store['dataframes'],self.target,targetcausal,store['var_names'],shapez=shapez)
+        else:
+            store = self.read_stored(exp=self.exp)
+            return self.score_corrFS(store['dataframes'],self.target,targetcausal,store['var_names'],shapez=shapez)
 
     def run_score_XAIFS(self):
-        store = self.read_stored()
-        return self.score_XAIFS(store['dataframes'],self.target,store['var_names'])
+        if self.alt_target=='Yes':
+            store = self.read_stored(exp=self.exp)
+            alt_store = self.read_stored(exp=self.alt_exp)
+            return self.score_XAIFS(alt_store['dataframes'],self.target,store['var_names'])
+        else:
+            store = self.read_stored()
+            return self.score_XAIFS(store['dataframes'],self.target,store['var_names'])
