@@ -56,13 +56,15 @@ class scoreboard:
         return score_dict
         
 class scores_seeds:
-    def __init__(self,seed=None,target=None,lag=None,exp=None,alt_exp=None,alt_target=None):
+    def __init__(self,seed=None,target=None,lag=None,exp=None,alt_exp=None,alt_target=None,prefix=None,suffix=None):
         self.seed=seed
         self.target=target
         self.lagtime=lag
         self.exp=exp
         self.alt_exp=alt_exp # Patch for experiment trained with VMAX
         self.alt_target=alt_target # Yes or No with routines with VMAX experiments
+        self.suffix=suffix
+        self.prefix=prefix
 
     def get_best_rf_vars(self,Xnorml=None,target=None,var_names=None):
         ytrain = np.concatenate([np.asarray(Xnorml['train'][key].dropna()[target][self.lagtime:]) for key in Xnorml['train'].keys()],axis=0)
@@ -109,8 +111,11 @@ class scores_seeds:
         """
         Scoreboard for models with causal feature selection
         """
-        causal_predictor_list = [var_names[i] for i in [obj[0] for obj in PC1_results[0]]]
-        
+        try:
+            causal_predictor_list = [var_names[i] for i in [obj[0] for obj in PC1_results[0][0]]]
+        except:
+            causal_predictor_list = [var_names[i] for i in [obj[0] for obj in PC1_results[0]]]
+                                     
         while target in causal_predictor_list: 
             causal_predictor_list.remove(target)
             
@@ -200,7 +205,10 @@ class scores_seeds:
         
     def read_stored(self,exp=None):
         #miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+'SHIPSonly_causal/'+'results_seed'+str(int(self.seed))+'.pkl')
-        return miss.read_pickle('../2024_causalML_results/results/'+str(self.lagtime)+'_tmin0/'+str(exp)+'/'+'results_seed'+str(int(self.seed))+'.pkl')
+        if self.suffix:
+            return miss.read_pickle(str(self.prefix)+str(self.lagtime)+'_tmin0/'+str(exp)+'/'+'results_seed'+str(int(self.seed))+str(self.suffix)+'.pkl')
+        else:
+            return miss.read_pickle(str(self.prefix)+str(self.lagtime)+'_tmin0/'+str(exp)+'/'+'results_seed'+str(int(self.seed))+'.pkl')
 
     def run_score_noFS(self):
         store = self.read_stored(exp=self.exp)
